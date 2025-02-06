@@ -1,0 +1,153 @@
+create database sqlprojects
+use sqlprojects
+;
+go
+create table products(productid int primary key,productname varchar(max) ,categoryid int foreign key references categories(categoryid))
+alter table products
+add  unitprice int ,stockquantity bigint
+create table categories(categoryid int primary key,categoryname varchar(max),description nvarchar(max))
+
+create table suppliers(supplierid int primary key ,suppliername varchar(max),contactname nvarchar(max),phone varchar(max) ,address varchar(max))
+
+create table inventory(inventoryid int primary key ,productid int foreign key references products(productid),warehouselocations varchar(max),stockquantity bigint)
+
+create table orders(orderid int primary key,customerid int foreign key references customers(customerid),orderdate date ,status varchar(max))
+
+create table orderdetails (orderdetailid int primary key ,orderid int foreign key references orders(orderid),productid int foreign key references products(productid),quantity int ,subtotal bigint)
+
+create table customers(customerid int primary key ,customername varchar(max),email varchar(max),phone varchar(max),address varchar(max))
+
+
+select * from products
+select * from categories
+select * from suppliers
+select * from inventory
+select * from orders
+select * from orderdetails
+select * from customers
+
+INSERT INTO Categories (CategoryID, CategoryName, Description) VALUES
+(1, 'Electronics', 'Electronic devices and accessories'),
+(2, 'Furniture', 'Home and office furniture'),
+(3, 'Clothing', 'Men, women, and kids clothing'),
+(4, 'Food', 'Groceries and perishable items'),
+(5, 'Automotive', 'Car parts and accessories');
+
+INSERT INTO Suppliers (SupplierID, SupplierName, ContactName, Phone, Address) VALUES
+(1, 'Tech Supplies Inc.', 'John Doe', '+1-800-555-1234', '123 Tech Street, New York, NY'),
+(2, 'Furniture World', 'Jane Smith', '+1-212-555-5678', '456 Home Lane, Los Angeles, CA'),
+(3, 'Clothing Co.', 'Mike Johnson', '+44 7911 654321', '78 Fashion Ave, London, UK'),
+(4, 'Food Distributors Ltd.', 'Emma Brown', '+33 1 23 45 67 89', '23 Gourmet Rd, Paris, France'),
+(5, 'AutoParts Express', 'Robert Wilson', '+49 30 1234567', '56 Motor St, Berlin, Germany');
+
+INSERT INTO Products (ProductID, ProductName, CategoryID, UnitPrice, StockQuantity) VALUES
+(1, 'Laptop', 1, 899.99, 50),
+(2, 'Office Chair', 2, 199.99, 100),
+(3, 'Men''s Jacket', 3, 79.99, 200),
+(4, 'Organic Apples (1kg)', 4, 3.99, 500),
+(5, 'Car Battery', 5, 129.99, 30);
+
+INSERT INTO Inventory (InventoryID, ProductID, warehouselocations, StockQuantity) VALUES
+(1, 1, 'A1-01', 50),
+(2, 2, 'B2-05', 100),
+(3, 3, 'C3-10', 200),
+(4, 4, 'D4-15', 500),
+(5, 5, 'E5-20', 30);
+
+INSERT INTO Customers (CustomerID, CustomerName, Email, Phone, Address) VALUES
+(1, 'Alice Green', 'alice.green@email.com', '+1-555-789-1234', '12 Maple St, Seattle, WA'),
+(2, 'Bob White', 'bob.white@email.com', '+44 7555 987654', '34 Elm St, London, UK'),
+(3, 'Charlie Black', 'charlie.black@email.com', '+49 170 7654321', '56 Oak St, Berlin, Germany');
+
+INSERT INTO Orders (OrderID, CustomerID, OrderDate, Status) VALUES
+(1, 1, '2025-02-06', 'Pending'),
+(2, 2, '2025-02-05', 'Shipped'),
+(3, 3, '2025-02-04', 'Delivered');
+
+INSERT INTO OrderDetails (OrderDetailID, OrderID, ProductID, Quantity, Subtotal) VALUES
+(1, 1, 1, 1, 899.99),
+(2, 1, 3, 2, 159.98),
+(3, 2, 2, 1, 199.99),
+(4, 3, 4, 10, 39.90);
+
+select * from products
+select * from categories
+select * from suppliers
+select * from inventory
+select * from orders
+select * from orderdetails
+select * from customers;
+go;
+create view fulltables as 
+select p.productid,productname,status,categoryname,description,i.stockquantity,orderdate from products as p join categories as c on p.categoryid=c.categoryid
+join inventory as i on i.productid=p.productid
+join orderdetails as d on d.productid=p.productid
+join orders as o on o.orderid=d.orderid
+
+select * from dbo.fulltables;
+go
+create view overall as 
+select p.productname,i.warehouselocations,sum(i.stockquantity) over(partition by p.productname) as overall from products as p
+join inventory as i on i.productid=p.productid
+join orderdetails as d on d.productid=p.productid
+join orders as o on o.orderid=d.orderid
+
+select * from dbo.overall
+
+create nonclustered index NewIndex
+on products(productid )
+
+create nonclustered index NewIndex1
+on categories(categoryid )
+
+create nonclustered index NewIndex2
+on suppliers(supplierid )
+
+create nonclustered index NewIndex3
+on inventory(inventoryid )
+;
+go
+create  function totalsales(@productname varchar(max),@categoryid int)
+returns decimal(20,2)
+begin 
+declare @totalsales as decimal(10,2)
+select @totalsales=unitprice*(select stockquantity from products where productname=@productname)  from products
+where categoryid=@categoryid
+return @totalsales
+end;
+go
+
+select dbo.totalsales('laptop',2)
+
+;
+go
+alter  procedure findmaxsale 
+@productname varchar(max),
+@categoryid int,
+@customerid int
+as
+begin
+select productname,sum(quantity) over(partition by productname) as quantity,count(d.orderid) over(partition by productname) as order_amount from products as p
+join inventory as i on i.productid=p.productid
+join orderdetails as d on d.productid=p.productid
+join orders as o on o.orderid=d.orderid
+where productname=@productname and categoryid=@categoryid and  customerid= @customerid
+end
+
+exec findmaxsale 'laptop',1,1
+;
+go
+create procedure quantity
+@categoryid int,
+@orddate varchar(max)
+as
+begin
+select categoryid,sum(p.stockquantity) over(partition by categoryid order by orderdate) full_quantity,orderdate from products as p
+join inventory as i on i.productid=p.productid
+join orderdetails as d on d.productid=p.productid
+join orders as o on o.orderid=d.orderid
+where categoryid=@categoryid and orderdate=@orddate
+end
+
+exec quantity 1,'2025-02-06'
+
