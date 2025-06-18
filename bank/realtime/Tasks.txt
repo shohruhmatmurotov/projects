@@ -1,0 +1,5 @@
+•	Access Control: Role-based access (Bank Owner, Branch Manager, Cashier).
+
+——
+5. Technical Requirements 11
+•	Accessibility: Solution must work across devices (desktop, tablet, mobile).

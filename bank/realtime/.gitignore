@@ -1,0 +1,4 @@
+.env
+/.idea
+/Csv_data
+sql_create_table.txt
